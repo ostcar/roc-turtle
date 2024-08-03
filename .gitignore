@@ -1,2 +1,10 @@
 .zig-cache
-zig-cache
+
+
+
+# generated for surgical linker
+platform/*.rh
+platform/*.rm
+platform/dynhost
+
+examples/*/main
