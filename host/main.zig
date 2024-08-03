@@ -6,14 +6,7 @@ const c = @cImport({
 const ArrayList = std.ArrayList;
 const math = std.math;
 
-const color_back = c.SDL_Color{
-    .r = 0,
-    .g = 0,
-    .b = 0,
-    .a = 255,
-};
-
-var global_state: GlobalState = undefined;
+var commander: Commander = undefined;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -48,9 +41,29 @@ pub fn main() !void {
     };
     defer c.SDL_DestroyRenderer(renderer);
 
-    global_state = try GlobalState.init(allocator, renderer, screen_w, screen_h);
-    defer global_state.deinit();
+    // Greate the ground texture and paint it white.
+    const ground = c.SDL_CreateTexture(renderer, c.SDL_PIXELFORMAT_RGBA8888, c.SDL_TEXTUREACCESS_TARGET, screen_w, screen_h);
+    defer c.SDL_DestroyTexture(ground);
+    _ = c.SDL_SetRenderTarget(renderer, ground);
+    _ = c.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    _ = c.SDL_RenderClear(renderer);
+    _ = c.SDL_SetRenderTarget(renderer, null);
 
+    var turtle = try Turtle.init(renderer, ground, .{ .x = 200, .y = 200 }, 0);
+    defer turtle.deinit();
+
+    commander = Commander{
+        .commands = ArrayList(Command).init(allocator),
+        .cur = 0,
+        .cur_done = 0,
+    };
+
+    // Call roc
+    try call_roc();
+
+    var turn_left = false;
+    var turn_right = false;
+    var turn_forward = false;
     var timer_last = c.SDL_GetPerformanceCounter();
     while (true) {
         // Timer
@@ -66,20 +79,38 @@ pub fn main() !void {
                 c.SDL_QUIT => {
                     return;
                 },
+                c.SDL_KEYDOWN => {
+                    switch (event.key.keysym.sym) {
+                        c.SDLK_a => turn_left = true,
+                        c.SDLK_d => turn_right = true,
+                        c.SDLK_w => turn_forward = true,
+                        else => {},
+                    }
+                },
+                c.SDL_KEYUP => {
+                    switch (event.key.keysym.sym) {
+                        c.SDLK_a => turn_left = false,
+                        c.SDLK_d => turn_right = false,
+                        c.SDLK_w => turn_forward = false,
+                        else => {},
+                    }
+                },
                 else => {},
             }
         }
 
         // Move Turtle
-        const curPos = global_state.turtle.position();
-        global_state.turtle.forward(100 * time_elapsed);
-        global_state.turtle.right(90 * time_elapsed);
-        try global_state.lines.append(.{ .start = curPos, .end = global_state.turtle.position(), .color = color_back });
+        if (turn_forward) turtle.forward(100 * time_elapsed);
+        if (turn_left) turtle.left(90 * time_elapsed);
+        if (turn_right) turtle.right(90 * time_elapsed);
+        commander.do(&turtle, time_elapsed);
 
         // Draw
         _ = c.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         _ = c.SDL_RenderClear(renderer);
-        global_state.draw();
+
+        _ = c.SDL_RenderCopy(renderer, ground, null, null);
+        turtle.draw();
 
         c.SDL_RenderPresent(renderer);
 
@@ -93,39 +124,52 @@ const Point = struct {
     y: c_int,
 };
 
-const GlobalState = struct {
-    renderer: ?*c.SDL_Renderer,
-    turtle: Turtle,
-    lines: ArrayList(Line),
-
-    fn init(allocator: std.mem.Allocator, renderer: ?*c.SDL_Renderer, screen_w: c_int, screen_h: c_int) !GlobalState {
-        const turtle = try Turtle.init(renderer, .{ .x = @divFloor(screen_w, 2), .y = @divFloor(screen_h, 2) }, 0);
-        const lines = ArrayList(Line).init(allocator);
-        return .{
-            .renderer = renderer,
-            .turtle = turtle,
-            .lines = lines,
-        };
-    }
-
-    fn deinit(self: GlobalState) void {
-        self.turtle.deinit();
-        self.lines.deinit();
-    }
-
-    fn draw(self: GlobalState) void {
-        self.turtle.draw(self.renderer);
-        for (self.lines.items) |line| {
-            line.draw(self.renderer);
-        }
-    }
-};
-
 const Command = union(enum) {
     forward: f64,
-    backward: f64,
     left: f64,
-    right: f64,
+    up,
+    down,
+};
+
+const Commander = struct {
+    commands: ArrayList(Command), // TODO: replace with some sort of fifo queue
+    cur: usize,
+    cur_done: f64,
+
+    fn add(self: *Commander, cmd: Command) !void {
+        try self.commands.append(cmd);
+    }
+
+    fn do(self: *Commander, turtle: *Turtle, time_elapsed: f64) void {
+        if (self.cur >= self.commands.items.len) return;
+
+        const done = switch (self.commands.items[self.cur]) {
+            Command.forward => |distance| blk: {
+                const step = @min(100 * time_elapsed, distance - self.cur_done);
+                turtle.forward(step);
+                self.cur_done += step;
+                break :blk self.cur_done >= distance;
+            },
+            Command.left => |angle| blk: {
+                const step = @min(90 * time_elapsed, angle - self.cur_done);
+                turtle.left(step);
+                self.cur_done += step;
+                break :blk self.cur_done >= angle;
+            },
+            Command.up => blk: {
+                turtle.up();
+                break :blk true;
+            },
+            Command.down => blk: {
+                turtle.down();
+                break :blk true;
+            },
+        };
+        if (done) {
+            self.cur += 1;
+            self.cur_done = 0;
+        }
+    }
 };
 
 const Turtle = struct {
@@ -134,8 +178,11 @@ const Turtle = struct {
     y: f64,
     angle: f64,
     image_texture: ?*c.SDL_Texture,
+    ground_texture: ?*c.SDL_Texture,
+    pen_down: bool = true,
+    renderer: ?*c.SDL_Renderer,
 
-    fn init(renderer: ?*c.SDL_Renderer, pos: Point, angle: f64) !Turtle {
+    fn init(renderer: ?*c.SDL_Renderer, ground: ?*c.SDL_Texture, pos: Point, angle: f64) !Turtle {
         const rw = c.SDL_RWFromConstMem(roc_image, roc_image.len) orelse {
             c.SDL_Log("Unable to get RWFromConstMem: %s", c.SDL_GetError());
             return error.SDLInitializationFailed;
@@ -153,10 +200,12 @@ const Turtle = struct {
         };
 
         return .{
+            .renderer = renderer,
             .x = @floatFromInt(pos.x),
             .y = @floatFromInt(pos.y),
             .angle = angle,
             .image_texture = image_texture,
+            .ground_texture = ground,
         };
     }
 
@@ -166,8 +215,23 @@ const Turtle = struct {
 
     fn forward(self: *Turtle, distance: f64) void {
         const a = math.degreesToRadians(self.angle);
-        self.x += @cos(a) * distance;
-        self.y += @sin(a) * distance;
+        const new_x = self.x + @cos(a) * distance;
+        const new_y = self.y + @sin(a) * distance;
+
+        if (self.pen_down) {
+            _ = c.SDL_SetRenderTarget(self.renderer, self.ground_texture);
+            _ = c.SDL_SetRenderDrawColor(self.renderer, 0, 0, 0, 255);
+            _ = c.SDL_RenderDrawLine(
+                self.renderer,
+                @intFromFloat(self.x),
+                @intFromFloat(self.y),
+                @intFromFloat(new_x),
+                @intFromFloat(new_y),
+            );
+            _ = c.SDL_SetRenderTarget(self.renderer, null);
+        }
+        self.x = new_x;
+        self.y = new_y;
     }
 
     fn backward(self: *Turtle, distance: f64) void {
@@ -182,6 +246,14 @@ const Turtle = struct {
         self.angle += angle;
     }
 
+    fn up(self: *Turtle) void {
+        self.pen_down = false;
+    }
+
+    fn down(self: *Turtle) void {
+        self.pen_down = true;
+    }
+
     fn position(self: Turtle) Point {
         return .{
             .x = @intFromFloat(self.x),
@@ -189,25 +261,14 @@ const Turtle = struct {
         };
     }
 
-    fn draw(self: Turtle, renderer: ?*c.SDL_Renderer) void {
+    fn draw(self: Turtle) void {
         const rect = c.SDL_Rect{
             .x = @as(c_int, @intFromFloat(self.x)) - 10,
             .y = @as(c_int, @intFromFloat(self.y)) - 10,
             .w = 20,
             .h = 20,
         };
-        _ = c.SDL_RenderCopyEx(renderer, self.image_texture, null, &rect, self.angle, null, c.SDL_FLIP_NONE);
-    }
-};
-
-const Line = struct {
-    start: Point,
-    end: Point,
-    color: c.SDL_Color,
-
-    fn draw(self: Line, renderer: ?*c.SDL_Renderer) void {
-        _ = c.SDL_SetRenderDrawColor(renderer, self.color.r, self.color.g, self.color.b, self.color.a);
-        _ = c.SDL_RenderDrawLine(renderer, self.start.x, self.start.y, self.end.x, self.end.y);
+        _ = c.SDL_RenderCopyEx(self.renderer, self.image_texture, null, &rect, self.angle, null, c.SDL_FLIP_NONE);
     }
 };
 
@@ -221,7 +282,17 @@ extern fn roc__mainForHost_1_exposed_size() callconv(.C) i64;
 
 extern fn roc__mainForHost_0_caller(flags: *const u8, closure_data: *const u8, output: *RocResult(void, RocStr)) void;
 
-fn call_the_closure(closure_data_ptr: *const u8) callconv(.C) i32 {
+fn call_roc() !void {
+    const size = @as(usize, @intCast(roc__mainForHost_1_exposed_size()));
+    const captures = roc_alloc(size, @alignOf(u128)).?;
+    defer roc_dealloc(captures, @alignOf(u128));
+
+    roc__mainForHost_1_exposed_generic(captures);
+
+    try call_the_closure(@as(*const u8, @ptrCast(captures)));
+}
+
+fn call_the_closure(closure_data_ptr: *const u8) !void {
     var out: RocResult(void, RocStr) = .{
         .payload = .{ .ok = void{} },
         .tag = .RocOk,
@@ -234,32 +305,32 @@ fn call_the_closure(closure_data_ptr: *const u8) callconv(.C) i32 {
     );
 
     switch (out.tag) {
-        .RocOk => return 0,
-        .RocErr => return 5, // TODO: Do something with the str
+        .RocOk => return,
+        .RocErr => return error.RocError,
     }
 }
 
-export fn roc_fx_forward(distance: u64) callconv(.C) RocResult(void, RocStr) {
-    // TODO: manipulate global turtle
-    _ = distance;
+export fn roc_fx_forward(distance: f64) callconv(.C) RocResult(void, void) {
+    commander.add(Command{ .forward = distance }) catch
+        return .{ .payload = .{ .err = void{} }, .tag = .RocErr };
     return .{ .payload = .{ .ok = void{} }, .tag = .RocOk };
 }
 
-export fn roc_fx_backward(distance: u64) callconv(.C) RocResult(void, RocStr) {
-    // TODO: manipulate global turtle
-    _ = distance;
+export fn roc_fx_backward(distance: f64) callconv(.C) RocResult(void, void) {
+    commander.add(Command{ .forward = -distance }) catch
+        return .{ .payload = .{ .err = void{} }, .tag = .RocErr };
     return .{ .payload = .{ .ok = void{} }, .tag = .RocOk };
 }
 
-export fn roc_fx_left(distance: u64) callconv(.C) RocResult(void, RocStr) {
-    // TODO: manipulate global turtle
-    _ = distance;
+export fn roc_fx_left(angle: f64) callconv(.C) RocResult(void, void) {
+    commander.add(Command{ .left = angle }) catch
+        return .{ .payload = .{ .err = void{} }, .tag = .RocErr };
     return .{ .payload = .{ .ok = void{} }, .tag = .RocOk };
 }
 
-export fn roc_fx_right(distance: u64) callconv(.C) RocResult(void, RocStr) {
-    // TODO: manipulate global turtle
-    _ = distance;
+export fn roc_fx_right(angle: f64) callconv(.C) RocResult(void, void) {
+    commander.add(Command{ .left = -angle }) catch
+        return .{ .payload = .{ .err = void{} }, .tag = .RocErr };
     return .{ .payload = .{ .ok = void{} }, .tag = .RocOk };
 }
 

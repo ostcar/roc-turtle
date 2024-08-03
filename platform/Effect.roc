@@ -16,7 +16,7 @@ hosted Effect
     generates Effect with [after, map, always, forever, loop]
 
 # effects that are provided by the host
-forward : U64 -> Effect (Result {} Str)
-backward: U64 -> Effect (Result {} Str)
-left: U64 -> Effect (Result {} Str)
-right: U64 -> Effect (Result {} Str)
+forward : F64 -> Effect (Result {} {})
+backward : F64 -> Effect (Result {} {})
+left : F64 -> Effect (Result {} {})
+right : F64 -> Effect (Result {} {})

@@ -1,10 +1,10 @@
 platform ""
-    requires {} { main : Task {} Str }
+    requires {} { main : Task {} {} }
     exposes [Task]
     packages {}
     imports [Task.{ Task }]
     provides [mainForHost]
 
-mainForHost : Task {} Str
+mainForHost : Task {} {}
 mainForHost =
     main
