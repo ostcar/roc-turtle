@@ -28,6 +28,7 @@ pub fn build(b: *Build) void {
     dynhost.rdynamic = true;
     dynhost.bundle_compiler_rt = true;
     dynhost.linkLibC();
+    dynhost.root_module.stack_check = false;
 
     if (target.query.isNativeOs() and target.result.os.tag == .linux) {
         // The SDL package doesn't work for Linux yet, so we rely on system
@@ -74,26 +75,25 @@ pub fn build(b: *Build) void {
         .optimize = optimize,
         .link_libc = true,
     });
-    // lib.linkSystemLibrary("SDL2");
-    // lib.linkSystemLibrary("sdl2_image");
-    const sdl_dep = b.dependency("sdl", .{
-        .optimize = .ReleaseFast,
-        .target = target,
-        // doesn't support SDL_RENDERER_TARGETTEXTURE
-        .render_driver_ogl_es = false,
-        // doesn't support SDL_RENDERER_ACCELERATED
-        .render_driver_software = false,
-    });
 
-    lib.linkLibrary(sdl_dep.artifact("SDL2"));
+    // const sdl_dep = b.dependency("sdl", .{
+    //     .optimize = .ReleaseFast,
+    //     .target = target,
+    //     // doesn't support SDL_RENDERER_TARGETTEXTURE
+    //     .render_driver_ogl_es = false,
+    //     // doesn't support SDL_RENDERER_ACCELERATED
+    //     .render_driver_software = false,
+    // });
+    // lib.linkLibrary(sdl_dep.artifact("SDL2"));
+
     lib.linkSystemLibrary("SDL2");
     lib.linkSystemLibrary("sdl2_image");
-    //lib.pic = true;
-    //lib.disable_stack_probing = true;
+    lib.root_module.pic = true;
+    lib.root_module.stack_check = false;
 
     // Copy legacy lib to platform
     const copy_legacy = b.addWriteFiles();
-    //const copy_legacy = b.addUpdateSourceFiles();
+    //const copy_legacy = b.addUpdateSourceFiles(); // for zig 0.14
     copy_legacy.addCopyFileToSource(lib.getEmittedBin(), "platform/linux-x64.o");
     copy_legacy.step.dependOn(&lib.step);
 
