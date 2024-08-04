@@ -26,6 +26,12 @@ jobs:
         with:
           version: 0.13.0
 
+      - name: Install sdl2
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libsdl2-dev libsdl2-image-dev
+          version: 1.0
+
       - name: Build platform
         run: zig build preprocess
 
