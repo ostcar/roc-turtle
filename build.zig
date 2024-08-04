@@ -49,6 +49,7 @@ pub fn build(b: *Build) void {
 
     // Copy dynhost to platform
     const copy_dynhost = b.addWriteFiles();
+    //const copy_dynhost = b.addUpdateSourceFiles();
     copy_dynhost.addCopyFileToSource(dynhost.getEmittedBin(), "platform/dynhost");
     copy_dynhost.step.dependOn(&dynhost.step);
 
@@ -92,6 +93,7 @@ pub fn build(b: *Build) void {
 
     // Copy legacy lib to platform
     const copy_legacy = b.addWriteFiles();
+    //const copy_legacy = b.addUpdateSourceFiles();
     copy_legacy.addCopyFileToSource(lib.getEmittedBin(), "platform/linux-x64.o");
     copy_legacy.step.dependOn(&lib.step);
 
