@@ -1,5 +1,5 @@
 # example of how to define an effect from the platform
-module [forward, backward, left, right]
+module [forward, backward, left, right, goto, up, down]
 
 import Effect
 import Task exposing [Task]
@@ -22,4 +22,19 @@ left = \angle ->
 right : F64 -> Task {} {}
 right = \angle ->
     Effect.right angle
+    |> Task.fromEffect
+
+goto : F64, F64 -> Task {} {}
+goto = \x, y ->
+    Effect.goto x y
+    |> Task.fromEffect
+
+up : Task {} {}
+up = 
+    Effect.up
+    |> Task.fromEffect
+
+down : Task {} {}
+down = 
+    Effect.down
     |> Task.fromEffect

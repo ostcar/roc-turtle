@@ -13,7 +13,7 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     const screen_w = 800;
-    const screen_h = 400;
+    const screen_h = 600;
 
     if (c.SDL_Init(c.SDL_INIT_VIDEO) != 0) {
         c.SDL_Log("Unable to initialize SDL: %s", c.SDL_GetError());
@@ -127,6 +127,7 @@ const Point = struct {
 const Command = union(enum) {
     forward: f64,
     left: f64,
+    goto: struct { x: f64, y: f64 },
     up,
     down,
 };
@@ -155,6 +156,25 @@ const Commander = struct {
                 turtle.left(step);
                 self.cur_done += step;
                 break :blk self.cur_done >= angle;
+            },
+            Command.goto => |point| blk: {
+                const distance_x = (point.x - turtle.x);
+                const distance_y = (point.y - turtle.y);
+
+                const full_distance = @sqrt(distance_x * distance_x + distance_y * distance_y);
+                const step_distance = 100 * time_elapsed;
+                if (step_distance >= full_distance) {
+                    turtle.goto(point.x, point.y);
+                    break :blk true;
+                }
+
+                // TODO: Is this correct? I would have guessed something like squer(step_distance² / full_distance²)
+                const rate = step_distance / full_distance; //@sqrt(step_distance * step_distance / full_distance * full_distance);
+                const x = distance_x * rate;
+                const y = distance_y * rate;
+
+                turtle.goto(turtle.x + x, turtle.y + y);
+                break :blk false;
             },
             Command.up => blk: {
                 turtle.up();
@@ -213,11 +233,7 @@ const Turtle = struct {
         c.SDL_DestroyTexture(self.image_texture);
     }
 
-    fn forward(self: *Turtle, distance: f64) void {
-        const a = math.degreesToRadians(self.angle);
-        const new_x = self.x + @cos(a) * distance;
-        const new_y = self.y + @sin(a) * distance;
-
+    fn goto(self: *Turtle, new_x: f64, new_y: f64) void {
         if (self.pen_down) {
             _ = c.SDL_SetRenderTarget(self.renderer, self.ground_texture);
             _ = c.SDL_SetRenderDrawColor(self.renderer, 0, 0, 0, 255);
@@ -232,6 +248,13 @@ const Turtle = struct {
         }
         self.x = new_x;
         self.y = new_y;
+    }
+
+    fn forward(self: *Turtle, distance: f64) void {
+        const a = math.degreesToRadians(self.angle);
+        const new_x = self.x + @cos(a) * distance;
+        const new_y = self.y + @sin(a) * distance;
+        self.goto(new_x, new_y);
     }
 
     fn backward(self: *Turtle, distance: f64) void {
@@ -322,6 +345,12 @@ export fn roc_fx_backward(distance: f64) callconv(.C) RocResult(void, void) {
     return .{ .payload = .{ .ok = void{} }, .tag = .RocOk };
 }
 
+export fn roc_fx_goto(x: f64, y: f64) callconv(.C) RocResult(void, void) {
+    commander.add(Command{ .goto = .{ .x = x, .y = y } }) catch
+        return .{ .payload = .{ .err = void{} }, .tag = .RocErr };
+    return .{ .payload = .{ .ok = void{} }, .tag = .RocOk };
+}
+
 export fn roc_fx_left(angle: f64) callconv(.C) RocResult(void, void) {
     commander.add(Command{ .left = angle }) catch
         return .{ .payload = .{ .err = void{} }, .tag = .RocErr };
@@ -330,6 +359,18 @@ export fn roc_fx_left(angle: f64) callconv(.C) RocResult(void, void) {
 
 export fn roc_fx_right(angle: f64) callconv(.C) RocResult(void, void) {
     commander.add(Command{ .left = -angle }) catch
+        return .{ .payload = .{ .err = void{} }, .tag = .RocErr };
+    return .{ .payload = .{ .ok = void{} }, .tag = .RocOk };
+}
+
+export fn roc_fx_up() callconv(.C) RocResult(void, void) {
+    commander.add(Command.up) catch
+        return .{ .payload = .{ .err = void{} }, .tag = .RocErr };
+    return .{ .payload = .{ .ok = void{} }, .tag = .RocOk };
+}
+
+export fn roc_fx_down() callconv(.C) RocResult(void, void) {
+    commander.add(Command.down) catch
         return .{ .payload = .{ .err = void{} }, .tag = .RocErr };
     return .{ .payload = .{ .ok = void{} }, .tag = .RocOk };
 }
