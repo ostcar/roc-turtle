@@ -214,7 +214,8 @@ const Turtle = struct {
     }
 
     fn forward(self: *Turtle, distance: f64) void {
-        const a = math.degreesToRadians(self.angle);
+        //const a = math.degreesToRadians(self.angle);
+        const a = math.degreesToRadians(f64, self.angle);
         const new_x = self.x + @cos(a) * distance;
         const new_y = self.y + @sin(a) * distance;
 
@@ -419,12 +420,12 @@ fn roc_mmap(addr: ?*anyopaque, length: c_uint, prot: c_int, flags: c_int, fd: c_
 comptime {
     const builtin = @import("builtin");
     if (builtin.os.tag == .macos or builtin.os.tag == .linux) {
-        @export(roc_getppid, .{ .name = "roc_getppid", .linkage = .strong });
-        @export(roc_mmap, .{ .name = "roc_mmap", .linkage = .strong });
-        @export(roc_shm_open, .{ .name = "roc_shm_open", .linkage = .strong });
+        @export(roc_getppid, .{ .name = "roc_getppid", .linkage = .Strong });
+        @export(roc_mmap, .{ .name = "roc_mmap", .linkage = .Strong });
+        @export(roc_shm_open, .{ .name = "roc_shm_open", .linkage = .Strong });
     }
 
     if (builtin.os.tag == .windows) {
-        @export(roc_getppid_windows_stub, .{ .name = "roc_getppid", .linkage = .strong });
+        @export(roc_getppid_windows_stub, .{ .name = "roc_getppid", .linkage = .Strong });
     }
 }

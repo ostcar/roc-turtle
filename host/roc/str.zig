@@ -212,7 +212,7 @@ pub const RocStr = extern struct {
             // just return the bytes
             return str;
         } else {
-            const new_str = RocStr.allocateBig(str.length, str.length);
+            var new_str = RocStr.allocateBig(str.length, str.length);
 
             var old_bytes: [*]u8 = @as([*]u8, @ptrCast(str.bytes));
             var new_bytes: [*]u8 = @as([*]u8, @ptrCast(new_str.bytes));
@@ -274,7 +274,7 @@ pub const RocStr = extern struct {
             const source_ptr = self.asU8ptr();
             const dest_ptr = result.asU8ptrMut();
 
-            @memcpy(dest_ptr[0..old_length], source_ptr[0..old_length]);
+            std.mem.copy(u8, dest_ptr[0..old_length], source_ptr[0..old_length]);
             @memset(dest_ptr[old_length..new_length], 0);
 
             self.decref();
@@ -290,7 +290,7 @@ pub const RocStr = extern struct {
 
             const source_ptr = self.asU8ptr();
 
-            @memcpy(dest_ptr[0..old_length], source_ptr[0..old_length]);
+            std.mem.copy(u8, dest_ptr[0..old_length], source_ptr[0..old_length]);
             @memset(dest_ptr[old_length..new_length], 0);
 
             self.decref();
@@ -554,13 +554,13 @@ pub fn strNumberOfBytes(string: RocStr) callconv(.C) usize {
 
 // Str.fromInt
 pub fn exportFromInt(comptime T: type, comptime name: []const u8) void {
-    const f = struct {
+    comptime var f = struct {
         fn func(int: T) callconv(.C) RocStr {
             return @call(.always_inline, strFromIntHelp, .{ T, int });
         }
     }.func;
 
-    @export(f, .{ .name = name ++ @typeName(T), .linkage = .strong });
+    @export(f, .{ .name = name ++ @typeName(T), .linkage = .Strong });
 }
 
 fn strFromIntHelp(comptime T: type, int: T) RocStr {
@@ -568,9 +568,9 @@ fn strFromIntHelp(comptime T: type, int: T) RocStr {
     const size = comptime blk: {
         // the string representation of the minimum i128 value uses at most 40 characters
         var buf: [40]u8 = undefined;
-        const resultMin = std.fmt.bufPrint(&buf, "{}", .{std.math.minInt(T)}) catch unreachable;
-        const resultMax = std.fmt.bufPrint(&buf, "{}", .{std.math.maxInt(T)}) catch unreachable;
-        const result = if (resultMin.len > resultMax.len) resultMin.len else resultMax.len;
+        var resultMin = std.fmt.bufPrint(&buf, "{}", .{std.math.minInt(T)}) catch unreachable;
+        var resultMax = std.fmt.bufPrint(&buf, "{}", .{std.math.maxInt(T)}) catch unreachable;
+        var result = if (resultMin.len > resultMax.len) resultMin.len else resultMax.len;
         break :blk result;
     };
 
@@ -582,13 +582,13 @@ fn strFromIntHelp(comptime T: type, int: T) RocStr {
 
 // Str.fromFloat
 pub fn exportFromFloat(comptime T: type, comptime name: []const u8) void {
-    const f = struct {
+    comptime var f = struct {
         fn func(float: T) callconv(.C) RocStr {
             return @call(.always_inline, strFromFloatHelp, .{ T, float });
         }
     }.func;
 
-    @export(f, .{ .name = name ++ @typeName(T), .linkage = .strong });
+    @export(f, .{ .name = name ++ @typeName(T), .linkage = .Strong });
 }
 
 fn strFromFloatHelp(comptime T: type, float: T) RocStr {
@@ -662,7 +662,7 @@ test "strSplitHelp: empty delimiter" {
 
     strSplitHelp(array_ptr, str, delimiter);
 
-    const expected = [1]RocStr{
+    var expected = [1]RocStr{
         str,
     };
 
@@ -696,7 +696,7 @@ test "strSplitHelp: no delimiter" {
 
     strSplitHelp(array_ptr, str, delimiter);
 
-    const expected = [1]RocStr{
+    var expected = [1]RocStr{
         str,
     };
 
@@ -735,7 +735,7 @@ test "strSplitHelp: empty start" {
 
     const one = RocStr.init("a", 1);
 
-    const expected = [2]RocStr{
+    var expected = [2]RocStr{
         RocStr.empty(), one,
     };
 
@@ -777,7 +777,7 @@ test "strSplitHelp: empty end" {
     const one = RocStr.init("1", 1);
     const two = RocStr.init("2", 1);
 
-    const expected = [3]RocStr{
+    var expected = [3]RocStr{
         one, two, RocStr.empty(),
     };
 
@@ -813,7 +813,7 @@ test "strSplitHelp: string equals delimiter" {
 
     strSplitHelp(array_ptr, str_delimiter, str_delimiter);
 
-    const expected = [2]RocStr{ RocStr.empty(), RocStr.empty() };
+    var expected = [2]RocStr{ RocStr.empty(), RocStr.empty() };
 
     defer {
         for (array) |rocStr| {
@@ -851,7 +851,7 @@ test "strSplitHelp: delimiter on sides" {
     const ghi_arr = "ghi";
     const ghi = RocStr.init(ghi_arr, ghi_arr.len);
 
-    const expected = [3]RocStr{
+    var expected = [3]RocStr{
         RocStr.empty(), ghi, RocStr.empty(),
     };
 
@@ -892,7 +892,7 @@ test "strSplitHelp: three pieces" {
     const b = RocStr.init("b", 1);
     const c = RocStr.init("c", 1);
 
-    const expected_array = [array_len]RocStr{
+    var expected_array = [array_len]RocStr{
         a, b, c,
     };
 
@@ -928,7 +928,7 @@ test "strSplitHelp: overlapping delimiter 1" {
 
     strSplitHelp(array_ptr, str, delimiter);
 
-    const expected = [2]RocStr{
+    var expected = [2]RocStr{
         RocStr.empty(),
         RocStr.init("a", 1),
     };
@@ -953,7 +953,7 @@ test "strSplitHelp: overlapping delimiter 2" {
 
     strSplitHelp(array_ptr, str, delimiter);
 
-    const expected = [3]RocStr{
+    var expected = [3]RocStr{
         RocStr.empty(),
         RocStr.empty(),
         RocStr.empty(),
@@ -1364,7 +1364,7 @@ fn strJoinWith(list: RocListStr, separator: RocStr) RocStr {
         total_size += separator.len() * (len - 1);
 
         var result = RocStr.allocate(total_size);
-        const result_ptr = result.asU8ptrMut();
+        var result_ptr = result.asU8ptrMut();
 
         var offset: usize = 0;
         for (slice[0 .. len - 1]) |substr| {
@@ -1943,7 +1943,7 @@ pub fn strTrimEnd(input_string: RocStr) callconv(.C) RocStr {
 fn countLeadingWhitespaceBytes(string: RocStr) usize {
     var byte_count: usize = 0;
 
-    const bytes = string.asU8ptr()[0..string.len()];
+    var bytes = string.asU8ptr()[0..string.len()];
     var iter = unicode.Utf8View.initUnchecked(bytes).iterator();
     while (iter.nextCodepoint()) |codepoint| {
         if (isWhitespace(codepoint)) {
@@ -1959,7 +1959,7 @@ fn countLeadingWhitespaceBytes(string: RocStr) usize {
 fn countTrailingWhitespaceBytes(string: RocStr) usize {
     var byte_count: usize = 0;
 
-    const bytes = string.asU8ptr()[0..string.len()];
+    var bytes = string.asU8ptr()[0..string.len()];
     var iter = ReverseUtf8View.initUnchecked(bytes).iterator();
     while (iter.nextCodepoint()) |codepoint| {
         if (isWhitespace(codepoint)) {
