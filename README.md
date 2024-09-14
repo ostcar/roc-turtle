@@ -9,7 +9,7 @@ Here is an example application:
 
 ```roc
 app [main] {
-    pf: platform "https://github.com/ostcar/roc-turtle/releases/download/v0.0.1/xiStykcN7qK5K0pu3NqrnriaYPPYJ7vtrxBmOjowdkU.tar.br"
+    pf: platform "https://github.com/ostcar/roc-turtle/releases/download/v0.0.2/q0zfdAsWWc0qkAOl-F20LIz0gs6yiN6aIDttQJHW_fQ.tar.br"
 }
 
 import pf.Turtle
@@ -48,7 +48,7 @@ Here is another example. Can you fix it?
 
 ```roc
 app [main] {
-    pf: platform "https://github.com/ostcar/roc-turtle/releases/download/v0.0.1/xiStykcN7qK5K0pu3NqrnriaYPPYJ7vtrxBmOjowdkU.tar.br",
+    pf: platform "https://github.com/ostcar/roc-turtle/releases/download/v0.0.2/q0zfdAsWWc0qkAOl-F20LIz0gs6yiN6aIDttQJHW_fQ.tar.br",
 }
 
 import pf.Turtle
