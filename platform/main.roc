@@ -1,8 +1,8 @@
 platform ""
     requires {} { main : Task {} {} }
-    exposes [Task]
+    exposes []
     packages {}
-    imports [Task.{ Task }]
+    imports []
     provides [mainForHost]
 
 mainForHost : Task {} {}

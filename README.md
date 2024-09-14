@@ -12,7 +12,6 @@ app [main] {
     pf: platform "https://github.com/ostcar/roc-turtle/releases/download/v0.0.1/xiStykcN7qK5K0pu3NqrnriaYPPYJ7vtrxBmOjowdkU.tar.br"
 }
 
-import pf.Task
 import pf.Turtle
 
 main =
@@ -52,7 +51,6 @@ app [main] {
     pf: platform "https://github.com/ostcar/roc-turtle/releases/download/v0.0.1/xiStykcN7qK5K0pu3NqrnriaYPPYJ7vtrxBmOjowdkU.tar.br",
 }
 
-import pf.Task
 import pf.Turtle
 
 main =
