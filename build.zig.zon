@@ -1,10 +1,10 @@
 .{
     .name = "roc-turtle",
-    .version = "0.0.1",
+    .version = "0.0.3",
     .dependencies = .{
-        .sdl = .{
-            .url = "https://github.com/allyourcodebase/SDL/archive/ccb56626ec75638457ed36d45a53683371d909c5.tar.gz",
-            .hash = "122092989e6ddcdb5c876cb3b7518474e638dede0e557006e8f39d51bcb1833bc848",
+        .@"raylib-zig" = .{
+            .url = "https://github.com/Not-Nik/raylib-zig/archive/devel.tar.gz",
+            .hash = "1220fc554f109a45a77ee5c58b4a847936dc0b24dcbed818b65a02de1b58500041dc",
         },
     },
     .paths = .{

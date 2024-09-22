@@ -30,21 +30,19 @@ pub fn build(b: *Build) void {
     dynhost.linkLibC();
     dynhost.root_module.stack_check = false;
 
-    if (target.query.isNativeOs() and target.result.os.tag == .linux) {
-        // The SDL package doesn't work for Linux yet, so we rely on system
-        // packages for now.
-        dynhost.linkSystemLibrary("SDL2");
-        dynhost.linkSystemLibrary("sdl2_image");
-    } else {
-        const sdl_dep = b.dependency("sdl", .{
-            .optimize = .ReleaseFast,
-            .target = target,
-        });
-        dynhost.linkLibrary(sdl_dep.artifact("SDL2"));
-    }
+    const raylib_dep = b.dependency("raylib-zig", .{
+        .target = target,
+        .optimize = optimize,
+    });
 
-    // const roc_std = b.createModule(.{ .source_file = .{ .path = "roc-std/glue.zig" } });
-    // dynhost.addModule("roc-std", roc_std);
+    const raylib = raylib_dep.module("raylib"); // main raylib module
+    const raygui = raylib_dep.module("raygui"); // raygui module
+    const raylib_artifact = raylib_dep.artifact("raylib"); // raylib C library
+    raylib_artifact.defineCMacro("SUPPORT_FILEFORMAT_PNG", null);
+
+    dynhost.linkLibrary(raylib_artifact);
+    dynhost.root_module.addImport("raylib", raylib);
+    dynhost.root_module.addImport("raygui", raygui);
 
     dynhost.addObjectFile(libapp_filename);
 
@@ -67,37 +65,22 @@ pub fn build(b: *Build) void {
     const cmd_preprocess = b.step("preprocess", "preprocess the platform");
     cmd_preprocess.dependOn(&preprocess_host.step);
 
-    // For legacy linker
-    const lib = b.addStaticLibrary(.{
-        .name = "linux-x86_64",
-        .root_source_file = b.path("host/main.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-
-    // const sdl_dep = b.dependency("sdl", .{
-    //     .optimize = .ReleaseFast,
+    // // For legacy linker
+    // const lib = b.addStaticLibrary(.{
+    //     .name = "linux-x86_64",
+    //     .root_source_file = b.path("host/main.zig"),
     //     .target = target,
-    //     // doesn't support SDL_RENDERER_TARGETTEXTURE
-    //     .render_driver_ogl_es = false,
-    //     // doesn't support SDL_RENDERER_ACCELERATED
-    //     .render_driver_software = false,
+    //     .optimize = optimize,
+    //     .link_libc = true,
     // });
-    // lib.linkLibrary(sdl_dep.artifact("SDL2"));
 
-    lib.linkSystemLibrary("SDL2");
-    lib.linkSystemLibrary("sdl2_image");
-    lib.root_module.pic = true;
-    lib.root_module.stack_check = false;
+    // // Copy legacy lib to platform
+    // const copy_legacy = b.addWriteFiles();
+    // //const copy_legacy = b.addUpdateSourceFiles(); // for zig 0.14
+    // copy_legacy.addCopyFileToSource(lib.getEmittedBin(), "platform/linux-x64.o");
+    // copy_legacy.step.dependOn(&lib.step);
 
-    // Copy legacy lib to platform
-    const copy_legacy = b.addWriteFiles();
-    //const copy_legacy = b.addUpdateSourceFiles(); // for zig 0.14
-    copy_legacy.addCopyFileToSource(lib.getEmittedBin(), "platform/linux-x64.o");
-    copy_legacy.step.dependOn(&lib.step);
-
-    // Command for legacy
-    const cmd_legacy = b.step("legacy", "build for legacy");
-    cmd_legacy.dependOn(&copy_legacy.step);
+    // // Command for legacy
+    // const cmd_legacy = b.step("legacy", "build for legacy");
+    // cmd_legacy.dependOn(&copy_legacy.step);
 }

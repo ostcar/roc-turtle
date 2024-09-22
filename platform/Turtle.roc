@@ -2,23 +2,23 @@ module [forward, backward, left, right, goto, up, down]
 
 import PlatformTasks
 
-forward : F64 -> Task {} {}
+forward : F32 -> Task {} {}
 forward = \distance ->
     PlatformTasks.forward distance
 
-backward : F64 -> Task {} {}
+backward : F32 -> Task {} {}
 backward = \distance ->
     PlatformTasks.backward distance
 
-left : F64 -> Task {} {}
+left : F32 -> Task {} {}
 left = \angle ->
     PlatformTasks.left angle
 
-right : F64 -> Task {} {}
+right : F32 -> Task {} {}
 right = \angle ->
     PlatformTasks.right angle
 
-goto : F64, F64 -> Task {} {}
+goto : F32, F32 -> Task {} {}
 goto = \x, y ->
     PlatformTasks.goto x y
 
