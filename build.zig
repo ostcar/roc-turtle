@@ -62,25 +62,25 @@ pub fn build(b: *Build) void {
     preprocess_host.step.dependOn(&copy_dynhost.step);
 
     // Command to preprocess host
-    const cmd_preprocess = b.step("preprocess", "preprocess the platform");
+    const cmd_preprocess = b.step("surgical", "creates the files necessary for the surgical linker");
     cmd_preprocess.dependOn(&preprocess_host.step);
 
-    // // For legacy linker
-    // const lib = b.addStaticLibrary(.{
-    //     .name = "linux-x86_64",
-    //     .root_source_file = b.path("host/main.zig"),
-    //     .target = target,
-    //     .optimize = optimize,
-    //     .link_libc = true,
-    // });
+    // For legacy linker
+    const lib = b.addStaticLibrary(.{
+        .name = "linux-x86_64",
+        .root_source_file = b.path("host/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
 
-    // // Copy legacy lib to platform
-    // const copy_legacy = b.addWriteFiles();
-    // //const copy_legacy = b.addUpdateSourceFiles(); // for zig 0.14
-    // copy_legacy.addCopyFileToSource(lib.getEmittedBin(), "platform/linux-x64.o");
-    // copy_legacy.step.dependOn(&lib.step);
+    // Copy legacy lib to platform
+    const copy_legacy = b.addWriteFiles();
+    //const copy_legacy = b.addUpdateSourceFiles(); // for zig 0.14
+    copy_legacy.addCopyFileToSource(lib.getEmittedBin(), "platform/linux-x64.o");
+    copy_legacy.step.dependOn(&lib.step);
 
-    // // Command for legacy
-    // const cmd_legacy = b.step("legacy", "build for legacy");
-    // cmd_legacy.dependOn(&copy_legacy.step);
+    // Command for legacy
+    const cmd_legacy = b.step("legacy", "build for legacy");
+    cmd_legacy.dependOn(&copy_legacy.step);
 }
