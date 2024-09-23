@@ -8,11 +8,19 @@ pub fn build(b: *Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const raylib_dep = b.dependency("raylib-zig", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const raylib = raylib_dep.module("raylib"); // main raylib module
+    const raylib_artifact = raylib_dep.artifact("raylib"); // raylib C library
+    raylib_artifact.defineCMacro("SUPPORT_FILEFORMAT_PNG", null);
+
     // Build libapp.so
     const build_libapp_so = b.addSystemCommand(&.{"roc"});
     build_libapp_so.addArgs(&.{ "build", "--lib" });
     build_libapp_so.addFileArg(b.path("examples/roc/main.roc"));
-    //build_libapp_so.addFileArg(.{ .path = "examples/roc/main.roc" });
     build_libapp_so.addArg("--output");
     const libapp_filename = build_libapp_so.addOutputFileArg("libapp.so");
 
@@ -20,7 +28,6 @@ pub fn build(b: *Build) void {
     const dynhost = b.addExecutable(.{
         .name = "dynhost",
         .root_source_file = b.path("host/main.zig"),
-        //.root_source_file = .{ .path = "host/main.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -30,21 +37,8 @@ pub fn build(b: *Build) void {
     dynhost.linkLibC();
     dynhost.root_module.stack_check = false;
 
-    if (target.query.isNativeOs() and target.result.os.tag == .linux) {
-        // The SDL package doesn't work for Linux yet, so we rely on system
-        // packages for now.
-        dynhost.linkSystemLibrary("SDL2");
-        dynhost.linkSystemLibrary("sdl2_image");
-    } else {
-        const sdl_dep = b.dependency("sdl", .{
-            .optimize = .ReleaseFast,
-            .target = target,
-        });
-        dynhost.linkLibrary(sdl_dep.artifact("SDL2"));
-    }
-
-    // const roc_std = b.createModule(.{ .source_file = .{ .path = "roc-std/glue.zig" } });
-    // dynhost.addModule("roc-std", roc_std);
+    dynhost.linkLibrary(raylib_artifact);
+    dynhost.root_module.addImport("raylib", raylib);
 
     dynhost.addObjectFile(libapp_filename);
 
@@ -64,37 +58,40 @@ pub fn build(b: *Build) void {
     preprocess_host.step.dependOn(&copy_dynhost.step);
 
     // Command to preprocess host
-    const cmd_preprocess = b.step("preprocess", "preprocess the platform");
+    const cmd_preprocess = b.step("surgical", "creates the files necessary for the surgical linker");
     cmd_preprocess.dependOn(&preprocess_host.step);
 
     // For legacy linker
     const lib = b.addStaticLibrary(.{
-        .name = "linux-x86_64",
+        .name = "linux-x86",
         .root_source_file = b.path("host/main.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
     });
 
-    // const sdl_dep = b.dependency("sdl", .{
-    //     .optimize = .ReleaseFast,
-    //     .target = target,
-    //     // doesn't support SDL_RENDERER_TARGETTEXTURE
-    //     .render_driver_ogl_es = false,
-    //     // doesn't support SDL_RENDERER_ACCELERATED
-    //     .render_driver_software = false,
-    // });
-    // lib.linkLibrary(sdl_dep.artifact("SDL2"));
+    lib.root_module.addImport("raylib", raylib);
 
-    lib.linkSystemLibrary("SDL2");
-    lib.linkSystemLibrary("sdl2_image");
-    lib.root_module.pic = true;
     lib.root_module.stack_check = false;
 
-    // Copy legacy lib to platform
+    // TODO: This is quite ugly. It creates .o files in some tmp directory.
+    // Is it possible, to do this directly with zig?
+    const tmp_dir = b.makeTempPath();
+
+    const extract_raylib = b.addSystemCommand(&.{ "ar", "x" });
+    extract_raylib.setCwd(Build.LazyPath{ .cwd_relative = tmp_dir });
+    extract_raylib.addFileArg(raylib_artifact.getEmittedBin());
+    lib.step.dependOn(&extract_raylib.step);
+    const files = [_][]const u8{ "raudio.o", "raygui.o", "rcore.o", "rglfw.o", "rmodels.o", "rshapes.o", "rtext.o", "rtextures.o", "utils.o" };
+    const od = std.fs.openDirAbsolute(tmp_dir, .{}) catch unreachable;
+    od.setAsCwd() catch unreachable;
+    for (files) |file| {
+        lib.addObjectFile(Build.LazyPath{ .cwd_relative = file });
+    }
+
     const copy_legacy = b.addWriteFiles();
     //const copy_legacy = b.addUpdateSourceFiles(); // for zig 0.14
-    copy_legacy.addCopyFileToSource(lib.getEmittedBin(), "platform/linux-x64.o");
+    copy_legacy.addCopyFileToSource(lib.getEmittedBin(), "platform/linux-x64.a");
     copy_legacy.step.dependOn(&lib.step);
 
     // Command for legacy

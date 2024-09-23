@@ -20,4 +20,3 @@ main =
     _ = Turtle.forward! 70
     _ = Turtle.left! 90
     Turtle.forward! 130
-

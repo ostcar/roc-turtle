@@ -10,10 +10,10 @@ hosted PlatformTasks
     ]
     imports []
 
-forward : F64 -> Task  {} {}
-backward : F64 -> Task  {} {}
-left : F64 -> Task  {} {}
-right : F64 -> Task  {} {}
-goto : F64, F64 -> Task  {} {}
+forward : F32 -> Task {} {}
+backward : F32 -> Task {} {}
+left : F32 -> Task {} {}
+right : F32 -> Task {} {}
+goto : F32, F32 -> Task {} {}
 up : Task {} {}
 down : Task {} {}
